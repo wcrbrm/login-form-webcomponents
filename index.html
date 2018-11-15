@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset='UTF-8' />
+	<meta name="robots" content="index,nofollow" />
+	<title>Admin area example</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimal-ui" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+
+
+<style>
+  html, body {margin: 0; padding: 0; }
+  * { font-family: sans-serif, arial; outline: none !important; box-sizing: border-box; }
+  .outdated { padding: 36px; background: #ffe0e0; text-align: center; font-family: 'sans-serif', arial; }
+</style>
+<script>
+if ( typeof window.customElements !== 'object' ) {
+  const divg = document.createElement('div')
+  divg.className = "outdated";
+  divg.innerHTML = 'Sorry, please use modern <a href="https://www.google.com/chrome/">Chrome browser</a> to access this page'; 
+  window.onload = function() { 
+    while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
+    document.body.appendChild(divg);
+  };
+}
+</script>
+
+<script>
+
+// this is the block that can be delivered from the server side
+var API_ROOT            = '/a/api'; 
+var _ACCESS_TOKEN = "Authorization";
+var API_INITIAL_TOKEN = "__AUTH__";
+
+var API_LOGIN_ENDPOINT  = API_ROOT + "/auth/check";
+var API_AUTH_ENDPOINT   = API_ROOT + "/auth/verify";
+var API_AUTH_HEADER     = 'X-Authorization'; // or typically 'Authorization';
+var API_REDIRECT_ON_SUCCESS = "./";
+
+window.API_ENV = "";
+
+const requestHeaders = { "Content-Type": "application/json" };
+const niceErrorMessage = (e) => { console.error(e); return "User Name or Password Error"; };
+
+const saveToken = (authToken) => {
+  localStorage.setItem(STORAGE_ACCESS_TOKEN, authToken);
+  window.location.href = API_REDIRECT_ON_SUCCESS;
+};
+
+const verifyAlreadyLoggedIn = () => {
+  const request = new URLSearchParams(window.location.search);
+  if (localStorage.getItem(STORAGE_ACCESS_TOKEN) && API_AUTH_ENDPOINT) {
+      console.log('Token taken from localStorage');
+      fetch(API_AUTH_ENDPOINT)
+      .then(r => {
+        window.location.href = API_REDIRECT_ON_SUCCESS;
+      }).catch(e => {
+        console.error(e);
+      });
+  } else {
+      console.log("no token kept or received");
+  }
+};
+window.onload = verifyAlreadyLoggedIn;
+
+customElements.define('admin-area', class extends HTMLElement {
+  constructor() {
+    super();
+    const style = document.createElement('style');
+    style.textContent = `
+      .main { 
+        font-family: sans-serif, arial; font-size: 14px; font-weight: bold;
+        text-align:center; padding: 20px; margin-bottom: 20px;
+        background-color: #d9edf7; 
+        background: linear-gradient(to bottom, #d9edf7 0%, #d9edf7 1%, #d9edf7 59%, rgba(125,185,232,0.45) 100%); 
+      }
+    `
+    const shadowRoot = this.attachShadow({mode: 'open'});
+    const div = document.createElement('div')
+    div.className = 'main';
+    div.innerHTML = `Admin Area`;
+
+    shadowRoot.appendChild(style);
+    shadowRoot.appendChild(div);
+  }
+})
+
+customElements.define('env-identity', class extends HTMLElement {
+  constructor() {
+    super();
+    if (window.API_ENV && window.API_ENV !== 'production') {
+      const style = document.createElement('style');
+      style.textContent = `
+        .env-top-line { position: fixed; background: #600; height:3px; left: 0px; top: 0px; width: 100%;}
+        .env-bottom-line { position: fixed; 
+          background:  #600; color: #ddd; 
+          font-family: sans-serif, arial; font-size: 12px; 
+          height:20px; line-height: 20px; padding-right: 20px;
+          left: 0px; bottom: 0px; width: calc(100% - 20px); text-align: right; 
+        }
+        .env-bottom-line strong { color: white; }
+      `
+      const shadowRoot = this.attachShadow({mode: 'open'});
+      shadowRoot.appendChild(style);
+      const divTop = document.createElement('div')
+      divTop.className = "env-top-line";
+      shadowRoot.appendChild(divTop);
+      const divBottom = document.createElement('div')
+      divBottom.className = "env-bottom-line";
+      divBottom.innerHTML = `Environment: <strong>${window.API_ENV}</strong>`;
+      shadowRoot.appendChild(divBottom);
+    }
+  }
+})
+
+customElements.define('safe-header-logo', class extends HTMLElement {
+  static get observedAttributes() { return ['logo']; }
+  get logo() { return this.getAttribute('logo'); }
+  constructor() { super(); this._shadowRoot = this.attachShadow({mode: 'open'}); }
+
+  connectedCallback(){
+    const style = document.createElement('style');
+    style.textContent = `
+      header { text-align: center; }
+      img { display: block; margin: 0px auto; }
+      @media (max-width: 480px) { img { width: 90%; padding: 0px; } }
+    `;
+
+    const shadowRoot = this.attachShadow({ mode: 'open' });
+    shadowRoot.appendChild(style);
+
+    const header = document.createElement('header')
+    if (this.logo) {
+	const img = document.createElement('img')
+	img.src = this.logo; // logo can go here
+	header.appendChild(img);
+    }
+    shadowRoot.appendChild(header);
+  }
+})
+
+customElements.define('small-spinner', class extends HTMLElement {
+  
+  static get observedAttributes() { return ['size', 'color']; }
+  get size() { return parseInt( this.getAttribute('size'), 10 ); }
+  get color() { return this.getAttribute('color'); }
+  constructor() { super(); this._shadowRoot = this.attachShadow({mode: 'open'}); }
+  connectedCallback(){
+
+    const size = this.size + 'px'
+    const size2 = (this.size * 0.75) +'px'
+    const color = this.color || '#444';
+    const style = document.createElement('style');
+    style.textContent = `
+      .lds-dual-ring { display: inline-block;  width: ${size}; height: ${size}; }
+      .lds-dual-ring:after { content: " "; display: block; width: ${size2}; height: ${size2}; margin: 1px;  border-radius: 50%;
+          border: 5px solid ${color}; border-color: ${color} transparent ${color} transparent; animation: lds-dual-ring 1.2s linear infinite; }
+      @keyframes lds-dual-ring { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    `;
+    const div = document.createElement('div');
+    div.className = "lds-dual-ring";
+
+    this._shadowRoot.appendChild(style);
+    this._shadowRoot.appendChild(div);
+  }
+});
+
+
+customElements.define('login-submission', class extends HTMLElement {
+ 
+  constructor() { 
+    super(); 
+    this._shadowRoot = this.attachShadow({ mode: 'open' }); 
+    this.submit = this.submit.bind(this);
+    this.onKeyPress = this.onKeyPress.bind(this);
+    this.startLoading = this.startLoading.bind(this);
+    this.stopLoading = this.stopLoading.bind(this);
+    this.isLoading = false;
+    this.errorMessage = '';
+    window.addEventListener("keydown", this.onKeyPress, false);
+  }
+
+  onKeyPress(e) {
+    if (e.keyCode === 13) { // 'm' was pressed
+      console.log('Enter pressed');
+      this.submit();
+      e.preventDefault();
+    }
+  };
+
+  startLoading() {
+    this.isLoading = true;
+    this.errorMessage = '';
+    this.reRender();
+  }
+
+  stopLoading(errorMessage) {
+    this.isLoading = false;
+    this.errorMessage = errorMessage;
+    this.reRender();
+    this.inputUsername.focus();
+  }
+
+  submit() {
+    if (this.button) {
+
+      if (!this.inputUsername.value && !this.inputPassword.value) {
+        this.stopLoading('Please provide username and password');
+        return;
+      }
+
+      this.startLoading();
+      fetch(API_LOGIN_ENDPOINT, { 
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify({
+          "username": this.inputUsername.value, 
+          "password": this.inputPassword.value 
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.authToken) {
+          saveToken(data.authToken)
+        } else if (data.reason) {
+          this.stopLoading(data.reason);
+        } else if (data.error) {
+          this.stopLoading(data.error);
+        } else {
+          this.stopLoading( 'Auth fail. No token received from the server');
+        }
+      })
+      .catch((e) => { this.stopLoading(niceErrorMessage(e)); });
+
+    } else {
+      console.log("hold on. no button to submit")
+    }
+  }
+
+  reRender() {
+    if (this.isLoading) {
+      this.inputUsername.setAttribute("disabled", "disabled");
+      this.inputPassword.setAttribute("disabled", "disabled");
+      this.divAction.innerHTML = `<small-spinner size="32" color="red"></small-spinner>';
+      `;
+    } else {
+      this.inputUsername.removeAttribute("disabled");
+      this.inputPassword.removeAttribute("disabled");
+
+      const htmlButton = '<button submit type="submit" class="btn">Log in</button>';
+      if (this.errorMessage) {
+        const errorMessage = this.errorMessage;
+        this.divAction.innerHTML = `<div class="alert alert-danger">${errorMessage}</div>${htmlButton}`;
+      } else {
+        this.divAction.innerHTML = htmlButton;
+      }
+    }
+    this.button = this._shadowRoot.querySelector('[submit]');
+    if (this.button) {
+      this.button.addEventListener('click', this.submit, false);
+    }
+  }
+  
+  connectedCallback(){
+    this.inputUsername = document.getElementById('username');
+    this.inputPassword = document.getElementById('password');
+    this.divAction = document.createElement('div');
+    this.divAction.className = 'action-group';
+
+    const style = document.createElement('style');
+    style.textContent = `
+      .alert-danger { color: #a94442; background-color: #f2dede; border-color: #ebccd1; margin: 20px 0px; padding:10px; }
+      .action-group { margin-top:20px; text-align:center; }
+      .btn { 
+        border: none; display: block; max-width: 90%; margin: 0px auto; text-align: center; font-size: 28px; font-weight: 700;
+        cursor: pointer; outline: none !important;
+        text-decoration: none; color: #fff; background-color: #F9B000; padding: 10px 50px; transition: all 0.1s ease-in-out;
+      }
+      .btn:hover, .btn:focus { box-shadow: 0 3px 2px rgba(0, 0, 0, 0.3); margin: -5px auto 5px; }
+    `;
+    this._shadowRoot.appendChild(style);
+    this._shadowRoot.appendChild(this.divAction);
+    this.reRender()
+  }
+})
+</script>
+
+<style>
+  .form-group { max-width: 420px; margin: 0 auto; }
+  @media (max-width: 420px) { .form-group { max-width: 90% }; }
+  .form-group label { display: block; padding: 5px 0px; margin-top: 15px; background: #808080;  border:1px solid #808080; text-align: center; color: #fff; }
+  .form-group input { display: block; width: 100%; max-width: 418px; height: 40px; padding: 10px 0px; border: 1px solid #D1D3D5; 
+    font-size: 16px; font-weight: normal; text-align: center; }
+</style>
+
+</head>
+<body>
+  <admin-area></admin-area>
+  <env-identity></env-identity>
+  <safe-header-logo logo=""></safe-header-logo>
+    
+  <!-- the only reason inputs are not in shadow DOM is autocomplete feature -->
+  <form name="admin-area" role="form">
+    <div class="form-group">
+      <label for="firstname">Login:</label>
+      <input type="text" id="username" name="username" autofocus placeholder="Login, email or phone" username/>
+      <label for="lastname">Password:</label>
+      <input type="password" id="password" name="password" placeholder="Password" password />
+      <login-submission></login-submission>
+    </div>
+  </form>
+
+</body>
+</html>
